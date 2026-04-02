@@ -135,18 +135,19 @@ Administrators view activity logs for all document operations (uploads, download
 - What happens when two users upload files with the same name at the same time? Each upload uses a unique generated filename, so no collision occurs.
 - What happens when a project is deleted but has associated documents? Documents associated with the project remain in users' personal document lists, with the project association cleared.
 - What happens when a user who uploaded a document is deactivated? Their documents remain accessible to anyone who previously had access; ownership transfers to an Administrator.
+- What happens when a user uploads 5 files and 2 fail validation? The 3 valid files are saved successfully; the user sees a per-file report showing which files succeeded and which failed with specific reasons (e.g., "file too large", "unsupported type").
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: System MUST allow authenticated users to upload one or more files in a single operation.
+- **FR-001**: System MUST allow authenticated users to upload one or more files in a single operation. When multiple files are uploaded and some fail validation, the system MUST save the valid files, reject the invalid ones, and display a per-file success/failure summary with reasons for each rejection.
 - **FR-002**: System MUST support the following file types: PDF, Word (.doc, .docx), Excel (.xls, .xlsx), PowerPoint (.ppt, .pptx), text (.txt), JPEG (.jpg, .jpeg), and PNG (.png).
 - **FR-003**: System MUST reject files exceeding 25 MB with a clear error message stating the limit.
 - **FR-004**: System MUST reject files with unsupported extensions with a message listing accepted types.
 - **FR-005**: System MUST require a document title and category for every upload.
 - **FR-006**: System MUST provide six predefined categories: Project Documents, Team Resources, Personal Files, Reports, Presentations, Other.
-- **FR-007**: System MUST automatically record upload date/time, uploader identity, file size, and file type for every uploaded document.
+- **FR-007**: System MUST automatically record upload date/time, uploader identity, file size, file type, and original filename for every uploaded document.
 - **FR-008**: System MUST allow users to optionally associate a document with a project they are a member of.
 - **FR-009**: System MUST allow users to add optional tags and a description to uploaded documents.
 - **FR-010**: System MUST display a progress indicator during file upload.
@@ -155,7 +156,7 @@ Administrators view activity logs for all document operations (uploads, download
 - **FR-013**: System MUST support filtering the document list by category, associated project, and date range.
 - **FR-014**: System MUST provide a search function that matches documents by title, description, tags, uploader name, and associated project name.
 - **FR-015**: System MUST restrict search results to documents the current user has permission to access.
-- **FR-016**: System MUST allow users to download any document they have access to, receiving the original file with its correct name and type.
+- **FR-016**: System MUST allow users to download any document they have access to, serving the file with the original filename (stored in metadata) and correct content type.
 - **FR-017**: System MUST provide in-browser preview for PDF and image (JPEG, PNG) documents without requiring a download.
 - **FR-018**: System MUST allow the document uploader to edit the document's title, description, category, and tags.
 - **FR-019**: System MUST allow the document uploader to replace the file with an updated version.
@@ -166,21 +167,21 @@ Administrators view activity logs for all document operations (uploads, download
 - **FR-024**: System MUST send an in-app notification to users when a document is shared with them.
 - **FR-025**: System MUST provide a "Shared with Me" view listing all documents shared with the current user.
 - **FR-026**: System MUST display all documents associated with a project on the project detail page, visible to all project members.
-- **FR-027**: System MUST allow users to upload and attach documents directly from a task detail page, auto-associating with the task's project.
+- **FR-027**: System MUST allow users to upload and attach documents directly from a task detail page, storing a direct link to the task and auto-associating with the task's project. The task detail page MUST show only documents attached to that specific task.
 - **FR-028**: System MUST display a "Recent Documents" widget on the dashboard home page showing the user's last 5 uploads.
 - **FR-029**: System MUST include a document count in the dashboard summary cards.
 - **FR-030**: System MUST notify project members when a new document is added to one of their projects.
 - **FR-031**: System MUST log all document operations (upload, download, delete, share) with timestamp, user, and document identifiers.
 - **FR-032**: System MUST allow Administrators to view the complete document activity log.
 - **FR-033**: System MUST allow Administrators to generate reports on most-uploaded file types, most active uploaders, and document access patterns.
-- **FR-034**: System MUST enforce authorization checks on every document access — users may only view, download, or manage documents they own, that are shared with them, or that belong to projects they are members of.
+- **FR-034**: System MUST enforce authorization checks on every document access — users may only view, download, or manage documents they own, that are shared with them, or that belong to projects they are members of. Administrators are exempt and MUST have full access to all documents for audit and compliance purposes. Team Leads MUST have read-only access (view and download) to documents uploaded by users in their department.
 - **FR-035**: System MUST store uploaded files outside the publicly accessible web directory and serve them only through authorized endpoints.
 - **FR-036**: System MUST use unique, system-generated filenames for stored files; user-supplied filenames MUST NOT be used in file paths.
 - **FR-037**: System MUST validate file content against the declared extension to prevent disguised file uploads (e.g., an `.exe` renamed to `.pdf`).
 
 ### Key Entities
 
-- **Document**: Represents an uploaded file and its metadata — title, description, category (text value from predefined list), tags, file size, file type (MIME type up to 255 characters), stored file path, upload date/time, and uploader. A Document may optionally be associated with one Project. Uses an integer identifier consistent with existing entities.
+- **Document**: Represents an uploaded file and its metadata — title, description, category (text value from predefined list), tags, original filename (as uploaded by the user), file size, file type (MIME type up to 255 characters), stored file path (GUID-based, not user-facing), upload date/time, and uploader. A Document may optionally be associated with one Project and optionally with one Task. When associated with a Task, the Document auto-associates with the Task's Project. Uses an integer identifier consistent with existing entities.
 - **DocumentShare**: Represents a sharing relationship between a Document and a User — tracks who shared, who received, and the date. Enables the "Shared with Me" view.
 - **DocumentActivity**: Represents a logged action on a document — operation type (upload, download, delete, share), performing user, timestamp, and target document. Enables the audit log and reporting for Administrators.
 
@@ -198,6 +199,16 @@ Administrators view activity logs for all document operations (uploads, download
 - **SC-008**: 90% of uploaded documents have a category assigned (enforced by the required category field).
 - **SC-009**: Zero unauthorized document access incidents — every access attempt is verified against permissions.
 - **SC-010**: All document operations (upload, download, delete, share) are captured in the activity log with no gaps.
+
+## Clarifications
+
+### Session 2026-04-02
+
+- Q: Should Administrators bypass standard document access rules for audit/compliance? → A: Yes — Admins can view, download, and manage ALL documents (full bypass of FR-034 access rules).
+- Q: What document permissions should Team Leads have beyond a regular Employee? → A: Team Leads can view and download documents uploaded by users in their department (read-only, no edit/delete).
+- Q: Should Document store a direct link to a Task, or only to the Project? → A: Document stores an optional TaskId — displays on the specific task AND the project.
+- Q: When uploading multiple files, if some fail validation what happens to the valid ones? → A: Save valid files, reject invalid ones, show per-file success/failure report.
+- Q: Should the system store the user's original filename for downloads, or use the document title? → A: Store original filename in metadata; use it as the download filename.
 
 ## Assumptions
 
