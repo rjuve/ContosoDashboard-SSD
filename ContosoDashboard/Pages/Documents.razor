@@ -1,0 +1,200 @@
+@page "/documents"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>My Documents - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>My Documents</h1>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" @onclick="ToggleUploadForm">
+                <span class="bi bi-upload" aria-hidden="true"></span> Upload Document
+            </button>
+        </div>
+    </div>
+
+    @if (showUploadForm)
+    {
+        <DocumentUpload UserId="currentUserId"
+                        UserProjects="userProjects"
+                        OnUploadComplete="HandleUploadComplete"
+                        OnCancel="ToggleUploadForm" />
+    }
+
+    <!-- Filters -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <select class="form-select" @bind="filterCategory" @bind:after="ApplyFilters">
+                <option value="">All Categories</option>
+                @foreach (var cat in Categories)
+                {
+                    <option value="@cat">@cat</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Project</label>
+            <select class="form-select" @bind="filterProjectId" @bind:after="ApplyFilters">
+                <option value="0">All Projects</option>
+                @if (userProjects != null)
+                {
+                    @foreach (var project in userProjects)
+                    {
+                        <option value="@project.ProjectId">@project.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">From Date</label>
+            <input type="date" class="form-control" @bind="filterFromDate" @bind:after="ApplyFilters" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">To Date</label>
+            <input type="date" class="form-control" @bind="filterToDate" @bind:after="ApplyFilters" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Sort By</label>
+            <select class="form-select" @bind="sortBy" @bind:after="ApplyFilters">
+                <option value="date">Upload Date</option>
+                <option value="title">Title</option>
+                <option value="category">Category</option>
+                <option value="filesize">File Size</option>
+            </select>
+        </div>
+    </div>
+
+    @if (documents == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (!documents.Any())
+    {
+        <div class="alert alert-info">No documents found. Upload your first document to get started!</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>File Type</th>
+                        <th>Size</th>
+                        <th>Project</th>
+                        <th>Upload Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in documents)
+                    {
+                        <tr>
+                            <td>
+                                <span class="bi @GetFileIcon(doc.FileType) me-1" aria-hidden="true"></span>
+                                @doc.Title
+                            </td>
+                            <td><span class="badge bg-secondary">@doc.Category</span></td>
+                            <td>@doc.OriginalFileName</td>
+                            <td>@FormatFileSize(doc.FileSize)</td>
+                            <td>@(doc.Project?.Name ?? "—")</td>
+                            <td>@doc.CreatedDate.ToString("MMM dd, yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Document>? documents;
+    private List<Project>? userProjects;
+    private int currentUserId;
+    private bool showUploadForm;
+
+    // Filters
+    private string filterCategory = "";
+    private int filterProjectId;
+    private DateTime? filterFromDate;
+    private DateTime? filterToDate;
+    private string sortBy = "date";
+
+    private static readonly string[] Categories =
+    {
+        "Project Documents", "Team Resources", "Personal Files", "Reports", "Presentations", "Other"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+        {
+            currentUserId = userId;
+        }
+
+        if (currentUserId > 0)
+        {
+            userProjects = await ProjectService.GetUserProjectsAsync(currentUserId);
+            await LoadDocuments();
+        }
+    }
+
+    private async Task LoadDocuments()
+    {
+        int? projectId = filterProjectId > 0 ? filterProjectId : null;
+        documents = await DocumentService.GetUserDocumentsAsync(
+            currentUserId,
+            string.IsNullOrEmpty(filterCategory) ? null : filterCategory,
+            projectId,
+            filterFromDate,
+            filterToDate,
+            sortBy,
+            descending: true);
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadDocuments();
+    }
+
+    private void ToggleUploadForm()
+    {
+        showUploadForm = !showUploadForm;
+    }
+
+    private async Task HandleUploadComplete()
+    {
+        showUploadForm = false;
+        await LoadDocuments();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    private static string GetFileIcon(string mimeType) => mimeType switch
+    {
+        "application/pdf" => "bi-file-earmark-pdf",
+        "image/jpeg" or "image/png" => "bi-file-earmark-image",
+        "text/plain" => "bi-file-earmark-text",
+        _ when mimeType.Contains("word") => "bi-file-earmark-word",
+        _ when mimeType.Contains("spreadsheet") || mimeType.Contains("excel") => "bi-file-earmark-excel",
+        _ when mimeType.Contains("presentation") || mimeType.Contains("powerpoint") => "bi-file-earmark-ppt",
+        _ => "bi-file-earmark"
+    };
+}

@@ -23,16 +23,16 @@ All paths relative to repository root. Project structure: `ContosoDashboard/` (s
 
 **Purpose**: Project initialization — new model files, service interfaces, DI wiring
 
-- [ ] T001 [P] Create Document entity model in ContosoDashboard/Models/Document.cs per data-model.md (14 fields: DocumentId, Title, Description, Category, Tags, OriginalFileName, FileSize, FileType, FilePath, UploadedById, ProjectId, TaskId, CreatedDate, UpdatedDate; navigation properties for User, Project, TaskItem, DocumentShares, DocumentActivities)
-- [ ] T002 [P] Create DocumentShare entity model in ContosoDashboard/Models/DocumentShare.cs per data-model.md (5 fields: DocumentShareId, DocumentId, SharedWithUserId, SharedByUserId, SharedDate; navigation properties)
-- [ ] T003 [P] Create DocumentActivity entity model in ContosoDashboard/Models/DocumentActivity.cs per data-model.md (6 fields: DocumentActivityId, DocumentId, UserId, ActivityType, Details, ActivityDate; navigation properties)
-- [ ] T004 Add NotificationType enum values DocumentShared and DocumentAddedToProject in ContosoDashboard/Models/Notification.cs per research.md R6
-- [ ] T005 Update ApplicationDbContext in ContosoDashboard/Data/ApplicationDbContext.cs: add DbSet<Document>, DbSet<DocumentShare>, DbSet<DocumentActivity>; configure relationships, delete behaviors (cascade for shares/activities, restrict for user, set-null for project/task), unique constraint on (DocumentId, SharedWithUserId), and indexes per data-model.md
-- [ ] T006 [P] Create IFileStorageService interface in ContosoDashboard/Services/IFileStorageService.cs with methods: UploadAsync, DownloadAsync, DeleteAsync, ExistsAsync per contracts/document-api.md
-- [ ] T007 Create LocalFileStorageService in ContosoDashboard/Services/LocalFileStorageService.cs implementing IFileStorageService using System.IO against {ContentRootPath}/AppData/uploads/ per research.md R4 (inject IWebHostEnvironment; label as training-only per constitution principle IV)
-- [ ] T008 [P] Create IDocumentService interface in ContosoDashboard/Services/DocumentService.cs with all method signatures per contracts/document-api.md IDocumentService section
-- [ ] T009 [P] Create IDocumentActivityService interface in ContosoDashboard/Services/DocumentActivityService.cs with method signatures per contracts/document-api.md IDocumentActivityService section
-- [ ] T010 Register new services in ContosoDashboard/Program.cs: AddScoped IFileStorageService/LocalFileStorageService, IDocumentService/DocumentService, IDocumentActivityService/DocumentActivityService; add AddControllers() and MapControllers() for the download/preview endpoint
+- [x] T001 [P] Create Document entity model in ContosoDashboard/Models/Document.cs per data-model.md (14 fields: DocumentId, Title, Description, Category, Tags, OriginalFileName, FileSize, FileType, FilePath, UploadedById, ProjectId, TaskId, CreatedDate, UpdatedDate; navigation properties for User, Project, TaskItem, DocumentShares, DocumentActivities)
+- [x] T002 [P] Create DocumentShare entity model in ContosoDashboard/Models/DocumentShare.cs per data-model.md (5 fields: DocumentShareId, DocumentId, SharedWithUserId, SharedByUserId, SharedDate; navigation properties)
+- [x] T003 [P] Create DocumentActivity entity model in ContosoDashboard/Models/DocumentActivity.cs per data-model.md (6 fields: DocumentActivityId, DocumentId, UserId, ActivityType, Details, ActivityDate; navigation properties)
+- [x] T004 Add NotificationType enum values DocumentShared and DocumentAddedToProject in ContosoDashboard/Models/Notification.cs per research.md R6
+- [x] T005 Update ApplicationDbContext in ContosoDashboard/Data/ApplicationDbContext.cs: add DbSet<Document>, DbSet<DocumentShare>, DbSet<DocumentActivity>; configure relationships, delete behaviors (cascade for shares/activities, restrict for user, set-null for project/task), unique constraint on (DocumentId, SharedWithUserId), and indexes per data-model.md
+- [x] T006 [P] Create IFileStorageService interface in ContosoDashboard/Services/IFileStorageService.cs with methods: UploadAsync, DownloadAsync, DeleteAsync, ExistsAsync per contracts/document-api.md
+- [x] T007 Create LocalFileStorageService in ContosoDashboard/Services/LocalFileStorageService.cs implementing IFileStorageService using System.IO against {ContentRootPath}/AppData/uploads/ per research.md R4 (inject IWebHostEnvironment; label as training-only per constitution principle IV)
+- [x] T008 [P] Create IDocumentService interface in ContosoDashboard/Services/DocumentService.cs with all method signatures per contracts/document-api.md IDocumentService section
+- [x] T009 [P] Create IDocumentActivityService interface in ContosoDashboard/Services/DocumentActivityService.cs with method signatures per contracts/document-api.md IDocumentActivityService section
+- [x] T010 Register new services in ContosoDashboard/Program.cs: AddScoped IFileStorageService/LocalFileStorageService, IDocumentService/DocumentService, IDocumentActivityService/DocumentActivityService; add AddControllers() and MapControllers() for the download/preview endpoint
 
 **Checkpoint**: Database schema auto-creates with new tables on next run. Service interfaces are injectable. No UI yet.
 
@@ -44,9 +44,9 @@ All paths relative to repository root. Project structure: `ContosoDashboard/` (s
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T011 Implement file validation helper (static class or private methods in DocumentService) in ContosoDashboard/Services/DocumentService.cs: extension whitelist check (FR-002/FR-004), file size check ≤25 MB (FR-003), magic-bytes content validation for PDF/JPEG/PNG/Office formats (FR-037, research.md R3), and extension-to-MIME-type mapping dictionary
-- [ ] T012 Implement authorization helper method in DocumentService (private method HasAccessAsync): check ownership, shared-with status, project membership, Team Lead department access, Administrator full bypass per FR-034 and contracts/document-api.md authorization matrix
-- [ ] T013 Implement DocumentActivityService.LogActivityAsync in ContosoDashboard/Services/DocumentActivityService.cs: create and save DocumentActivity record (FR-031)
+- [x] T011 Implement file validation helper (static class or private methods in DocumentService) in ContosoDashboard/Services/DocumentService.cs: extension whitelist check (FR-002/FR-004), file size check ≤25 MB (FR-003), magic-bytes content validation for PDF/JPEG/PNG/Office formats (FR-037, research.md R3), and extension-to-MIME-type mapping dictionary
+- [x] T012 Implement authorization helper method in DocumentService (private method HasAccessAsync): check ownership, shared-with status, project membership, Team Lead department access, Administrator full bypass per FR-034 and contracts/document-api.md authorization matrix
+- [x] T013 Implement DocumentActivityService.LogActivityAsync in ContosoDashboard/Services/DocumentActivityService.cs: create and save DocumentActivity record (FR-031)
 
 **Checkpoint**: Foundation ready — validation, authorization, and activity logging are available for all user story implementations.
 
@@ -60,11 +60,11 @@ All paths relative to repository root. Project structure: `ContosoDashboard/` (s
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Implement DocumentService.UploadDocumentAsync in ContosoDashboard/Services/DocumentService.cs: validate file (call T011 helpers), generate GUID-based relative path ({userId}/{projectId|personal}/{guid}.{ext}), save file via IFileStorageService.UploadAsync, create Document entity, save to DB, log activity "Upload" via IDocumentActivityService, notify project members if ProjectId is set (FR-030) via INotificationService (FR-001, FR-005–FR-010, FR-035, FR-036)
-- [ ] T015 [US1] Implement DocumentService.GetUserDocumentsAsync in ContosoDashboard/Services/DocumentService.cs: query documents where UploadedById == userId with optional category/project/date-range filters and sortBy parameter (FR-011, FR-012, FR-013), include navigation properties for Project
-- [ ] T016 [US1] Create Documents.razor page in ContosoDashboard/Pages/Documents.razor: "My Documents" view with [Authorize] attribute, table showing title/category/upload date/file size/associated project, sort controls, filter dropdowns for category/project/date range, and Upload button that opens upload form (FR-011, FR-012, FR-013)
-- [ ] T017 [US1] Create upload form component in ContosoDashboard/Pages/DocumentUpload.razor: InputFile with multi-file support (IBrowserFile, maxAllowedSize 25MB per research.md R1), title input (required), category dropdown with 6 predefined values (FR-006), optional description textarea, optional tags input, optional project selector (only projects user belongs to via IProjectService), progress bar tracking bytes read per file (FR-010, research.md R5), per-file success/failure summary display (FR-001 partial failure)
-- [ ] T018 [US1] Add "Documents" link to navigation menu in ContosoDashboard/Shared/NavMenu.razor pointing to /documents
+- [x] T014 [US1] Implement DocumentService.UploadDocumentAsync in ContosoDashboard/Services/DocumentService.cs: validate file (call T011 helpers), generate GUID-based relative path ({userId}/{projectId|personal}/{guid}.{ext}), save file via IFileStorageService.UploadAsync, create Document entity, save to DB, log activity "Upload" via IDocumentActivityService, notify project members if ProjectId is set (FR-030) via INotificationService (FR-001, FR-005–FR-010, FR-035, FR-036)
+- [x] T015 [US1] Implement DocumentService.GetUserDocumentsAsync in ContosoDashboard/Services/DocumentService.cs: query documents where UploadedById == userId with optional category/project/date-range filters and sortBy parameter (FR-011, FR-012, FR-013), include navigation properties for Project
+- [x] T016 [US1] Create Documents.razor page in ContosoDashboard/Pages/Documents.razor: "My Documents" view with [Authorize] attribute, table showing title/category/upload date/file size/associated project, sort controls, filter dropdowns for category/project/date range, and Upload button that opens upload form (FR-011, FR-012, FR-013)
+- [x] T017 [US1] Create upload form component in ContosoDashboard/Pages/DocumentUpload.razor: InputFile with multi-file support (IBrowserFile, maxAllowedSize 25MB per research.md R1), title input (required), category dropdown with 6 predefined values (FR-006), optional description textarea, optional tags input, optional project selector (only projects user belongs to via IProjectService), progress bar tracking bytes read per file (FR-010, research.md R5), per-file success/failure summary display (FR-001 partial failure)
+- [x] T018 [US1] Add "Documents" link to navigation menu in ContosoDashboard/Shared/NavMenu.razor pointing to /documents
 
 **Checkpoint**: User Story 1 fully functional — users can upload documents with metadata and see them listed. This is the MVP.
 

@@ -1,0 +1,219 @@
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@inject IDocumentService DocumentService
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Upload Documents</h5>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="OnCancel">
+            <span class="bi bi-x-lg" aria-hidden="true"></span>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">Files</label>
+            <InputFile OnChange="OnFilesSelected" multiple class="form-control"
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" />
+            <div class="form-text">Allowed: PDF, Word, Excel, PowerPoint, Text, JPEG, PNG. Max 25 MB per file.</div>
+        </div>
+
+        @if (selectedFiles.Any())
+        {
+            <div class="mb-3">
+                <label class="form-label">Selected Files</label>
+                <ul class="list-group">
+                    @foreach (var file in selectedFiles)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@file.Name (@FormatFileSize(file.Size))</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" @bind="title" placeholder="Document title" maxlength="255" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Category <span class="text-danger">*</span></label>
+            <select class="form-select" @bind="category">
+                <option value="">Select category...</option>
+                <option value="Project Documents">Project Documents</option>
+                <option value="Team Resources">Team Resources</option>
+                <option value="Personal Files">Personal Files</option>
+                <option value="Reports">Reports</option>
+                <option value="Presentations">Presentations</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="description" rows="2" maxlength="2000" placeholder="Optional description"></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tags</label>
+            <input type="text" class="form-control" @bind="tags" placeholder="Comma-separated tags" maxlength="1000" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Project</label>
+            <select class="form-select" @bind="selectedProjectId">
+                <option value="0">None (Personal)</option>
+                @if (UserProjects != null)
+                {
+                    @foreach (var project in UserProjects)
+                    {
+                        <option value="@project.ProjectId">@project.Name</option>
+                    }
+                }
+            </select>
+        </div>
+
+        @if (isUploading)
+        {
+            <div class="mb-3">
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar"
+                         style="width: @progressPercent%"
+                         aria-valuenow="@progressPercent"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                        @progressPercent% (@completedFiles/@totalFiles files)
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (uploadResults.Any())
+        {
+            <div class="mb-3">
+                @foreach (var result in uploadResults)
+                {
+                    <div class="alert @(result.Success ? "alert-success" : "alert-danger") py-1 mb-1">
+                        <span class="bi @(result.Success ? "bi-check-circle" : "bi-x-circle")" aria-hidden="true"></span>
+                        @result.FileName: @result.Message
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <button class="btn btn-primary" @onclick="UploadFiles" disabled="@(!CanUpload)">
+            <span class="bi bi-upload" aria-hidden="true"></span> Upload
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public List<Project>? UserProjects { get; set; }
+    [Parameter] public EventCallback OnUploadComplete { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private List<IBrowserFile> selectedFiles = new();
+    private string title = "";
+    private string category = "";
+    private string? description;
+    private string? tags;
+    private int selectedProjectId;
+    private bool isUploading;
+    private int progressPercent;
+    private int completedFiles;
+    private int totalFiles;
+    private string? errorMessage;
+    private List<UploadResult> uploadResults = new();
+
+    private bool CanUpload => selectedFiles.Any()
+        && !string.IsNullOrWhiteSpace(title)
+        && !string.IsNullOrWhiteSpace(category)
+        && !isUploading;
+
+    private void OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        selectedFiles = e.GetMultipleFiles(maximumFileCount: 10).ToList();
+        uploadResults.Clear();
+        errorMessage = null;
+    }
+
+    private async Task UploadFiles()
+    {
+        if (!CanUpload) return;
+
+        isUploading = true;
+        errorMessage = null;
+        uploadResults.Clear();
+        completedFiles = 0;
+        totalFiles = selectedFiles.Count;
+        progressPercent = 0;
+
+        int? projectId = selectedProjectId > 0 ? selectedProjectId : null;
+
+        foreach (var file in selectedFiles)
+        {
+            try
+            {
+                // Copy to MemoryStream to avoid disposal between render cycles
+                using var memoryStream = new MemoryStream();
+                await using var browserStream = file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024);
+
+                var buffer = new byte[81920];
+                long totalRead = 0;
+                int bytesRead;
+                while ((bytesRead = await browserStream.ReadAsync(buffer)) > 0)
+                {
+                    await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                    totalRead += bytesRead;
+
+                    // Update progress based on bytes read across all files
+                    var fileProgress = (double)totalRead / file.Size;
+                    progressPercent = (int)(((completedFiles + fileProgress) / totalFiles) * 100);
+                    StateHasChanged();
+                }
+
+                memoryStream.Position = 0;
+                var fileTitle = selectedFiles.Count == 1 ? title : $"{title} - {file.Name}";
+
+                await DocumentService.UploadDocumentAsync(
+                    UserId, memoryStream, file.Name, fileTitle, category,
+                    description, tags, projectId, null);
+
+                uploadResults.Add(new UploadResult(file.Name, true, "Uploaded successfully"));
+            }
+            catch (Exception ex)
+            {
+                uploadResults.Add(new UploadResult(file.Name, false, ex.Message));
+            }
+
+            completedFiles++;
+            progressPercent = (int)((double)completedFiles / totalFiles * 100);
+            StateHasChanged();
+        }
+
+        isUploading = false;
+
+        // If at least one file succeeded, notify parent
+        if (uploadResults.Any(r => r.Success))
+        {
+            await OnUploadComplete.InvokeAsync();
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    private record UploadResult(string FileName, bool Success, string Message);
+}
